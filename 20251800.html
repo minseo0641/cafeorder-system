@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cafe Ordering System with Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            nude: {
+              50: '#fbfbf9',   // 깔끔한 화이트 아이보리 바탕
+              100: '#f7f4ef',  // 밝은 누드톤 카드 배경
+              200: '#ede7de',  // 중간 누드톤 테두리 및 선
+              300: '#e0d5c1',  // 짙은 베이지 화살표 포인트
+              700: '#736653',  // 보조 텍스트 컬러
+              800: '#5c5243',  // 메인 브라운 텍스트
+              950: '#2b241a',  // 딥 브라운 타이틀 텍스트
+            }
+          }
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background-color: #fbfbf9;
+      color: #2b241a;
+    }
+    .font-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+    
+    /* 클래스 카드 인터랙션 효과 */
+    .class-node { transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+    .class-node:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px -8px rgba(92, 82, 67, 0.2);
+    }
+    .class-node:active { transform: translateY(0); }
+    
+    /* 콘솔 로그 애니메이션 */
+    .console-line { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* 크리티컬 / 펌블 특수 효과 */
+    @keyframes procPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(115, 102, 83, 0.2); }
+      50% { box-shadow: 0 4px 20px rgba(115, 102, 83, 0.4); }
+    }
+    @keyframes procShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-2px); }
+      75% { transform: translateX(2px); }
+    }
+    .proc-banner { animation: procPulse 1.4s ease infinite; }
+    .proc-fumble { animation: procShake 0.35s ease; }
+    .rng-meter-fill { transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+    
+    /* 영수증 아키텍처 디자인 */
+    .receipt-paper {
+      background-color: #ffffff;
+      box-shadow: 0 4px 24px rgba(92, 82, 67, 0.08), inset 0 1px 0 rgba(255,255,255,0.95);
+    }
+    .receipt-zigzag {
+      background-image: linear-gradient(135deg, #ede7de 25%, transparent 25%),
+        linear-gradient(225deg, #ede7de 25%, transparent 25%);
+      background-size: 12px 6px;
+      background-position: 0 0, 6px 0;
+      height: 6px;
+    }
+    .card-img { object-fit: cover; filter: grayscale(10%) sepia(8%); }
+
+    /* 노드 플래시 애니메이션 효과 */
+    @keyframes nodeFlash {
+      0% { ring-color: rgba(43, 36, 26, 0.1); box-shadow: 0 0 0 0 rgba(43, 36, 26, 0.4); }
+      50% { ring-color: rgba(43, 36, 26, 0.8); box-shadow: 0 0 0 12px rgba(43, 36, 26, 0); }
+      100% { ring-color: rgba(43, 36, 26, 0.1); box-shadow: 0 0 0 0 rgba(43, 36, 26, 0); }
+    }
+    .flash-active {
+      animation: nodeFlash 1s cubic-bezier(0.25, 1, 0.5, 1);
+      border-color: #2b241a !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-nude-950 flex flex-col font-semibold">
+
+  <header class="bg-white border-b border-nude-200 shadow-sm">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <p class="text-nude-800 text-xs font-bold tracking-widest uppercase mb-1">☕ Warm & Cozy Cafe</p>
+        <h1 class="font-display text-3xl font-bold text-nude-950">Cafe Ordering System</h1>
+      </div>
+      <p class="text-sm text-nude-800 max-w-md leading-relaxed font-normal">
+        <code class="text-nude-950 bg-nude-100 px-1.5 py-0.5 rounded font-mono text-xs border border-nude-200">BeverageADT</code>를 구현한 클래스 카드를 클릭하면 하단 <span class="text-nude-950 font-bold">Barista 알림판</span>에 확률적 다형성 결과가 동적으로 출력됩니다.
+      </p>
+    </div>
+  </header>
+
+  <section class="bg-nude-50 border-b border-nude-200 py-4 shadow-inner">
+    <div class="max-w-6xl mx-auto px-6 grid grid-cols-3 gap-4 text-center">
+      <div class="bg-white border border-nude-200 rounded-2xl p-3 shadow-sm">
+        <span class="block text-[10px] font-bold text-nude-700 uppercase tracking-wider mb-0.5">💰 누적 총매출</span>
+        <span id="stat-sales" class="font-mono text-base sm:text-lg font-bold text-nude-950">0원</span>
+      </div>
+      <div class="bg-white border border-nude-200 rounded-2xl p-3 shadow-sm">
+        <span class="block text-[10px] font-bold text-nude-700 uppercase tracking-wider mb-0.5">✨ 골든 크리티컬</span>
+        <span id="stat-critical" class="font-mono text-base sm:text-lg font-bold text-emerald-700">0회</span>
+      </div>
+      <div class="bg-white border border-nude-200 rounded-2xl p-3 shadow-sm">
+        <span class="block text-[10px] font-bold text-nude-700 uppercase tracking-wider mb-0.5">😢 컴플레인 손실</span>
+        <span id="stat-fumble" class="font-mono text-base sm:text-lg font-bold text-rose-700">0회</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="flex-1 max-w-6xl mx-auto w-full px-6 py-10 grid lg:grid-cols-12 gap-10">
+    
+    <section aria-labelledby="hierarchy-heading" class="lg:col-span-7">
+      <h2 id="hierarchy-heading" class="text-sm font-bold tracking-wider text-nude-800 uppercase mb-4 flex items-center gap-2">
+        <span>🧩</span> CLASS HIERARCHY & UML DIAGRAM
+      </h2>
+
+      <div class="rounded-3xl border border-nude-200 bg-nude-100 p-6 md:p-8 shadow-sm relative">
+        
+        <div class="flex flex-col items-center">
+          <button
+            type="button"
+            id="node-interface"
+            data-class="BeverageADT"
+            class="class-node w-full max-w-md text-left rounded-2xl border-2 border-dashed border-nude-300 bg-white px-5 py-4 focus:outline-none"
+          >
+            <div class="flex gap-4 items-center">
+              <span class="text-3xl text-nude-800" aria-hidden="true">📋</span>
+              <div>
+                <span class="text-[10px] font-mono text-nude-700 uppercase tracking-widest block font-bold">«interface»</span>
+                <span class="block text-lg font-bold text-nude-950 font-display">BeverageADT</span>
+                <span class="block text-xs text-nude-800 mt-1 font-mono font-bold">+name: property | +price: property</span>
+                <span class="block text-xs text-nude-800 font-mono font-bold">+prepare(): void</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div class="flex flex-col items-center my-4">
+          <span class="text-[10px] font-mono font-bold text-nude-700 mb-1">implements</span>
+          <div class="flex flex-col items-center">
+            <div class="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[11px] border-b-nude-300 bg-nude-100"></div>
+            <div class="w-[2px] h-10 border-l-2 border-dashed border-nude-300 -mt-[1px]"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-col items-center">
+          <button
+            type="button"
+            id="node-drink"
+            data-class="Drink"
+            class="class-node w-full max-w-md text-left rounded-2xl border border-nude-200 bg-white overflow-hidden focus:outline-none shadow-sm"
+          >
+            <div class="h-28 w-full overflow-hidden bg-nude-50 border-b border-nude-200">
+              <img
+                src="https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&q=80"
+                alt="시원한 음료"
+                class="card-img w-full h-full"
+                width="500"
+                height="112"
+                loading="lazy"
+              />
+            </div>
+            <div class="px-5 py-4">
+              <span class="text-[10px] font-mono text-nude-700 uppercase tracking-widest block font-bold">«abstract class»</span>
+              <span class="block text-lg font-bold text-nude-950 font-display flex items-center gap-2">
+                🥤 Drink
+              </span>
+              <span class="block text-xs text-nude-800 mt-1 font-bold">extends <span class="text-nude-950 font-mono">BeverageADT</span></span>
+              <span class="block text-xs text-nude-700 mt-1 font-mono">-_name: String | -_price: int</span>
+              <span class="block text-xs text-nude-700 font-mono">+name: property | +price: property</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="relative my-6 flex flex-col items-center">
+          <span class="text-[10px] font-mono font-bold text-nude-700 mb-1">extends</span>
+          
+          <div class="w-[2px] h-5 bg-nude-300"></div>
+          
+          <div class="w-3/4 h-[2px] bg-nude-300 relative">
+            <div class="absolute left-0 top-0 w-[2px] h-5 bg-nude-300"></div>
+            <div class="absolute left-[-6px] top-5 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[11px] border-b-nude-300 rotate-180"></div>
+            
+            <div class="absolute right-0 top-0 w-[2px] h-5 bg-nude-300"></div>
+            <div class="absolute right-[-6px] top-5 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[11px] border-b-nude-300 rotate-180"></div>
+          </div>
+          <div class="h-5"></div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-6 mt-2">
+          <button
+            type="button"
+            id="node-coffee"
+            data-class="Coffee"
+            class="class-node text-left rounded-2xl border border-nude-200 bg-white overflow-hidden focus:outline-none shadow-sm"
+          >
+            <div class="h-24 w-full overflow-hidden bg-nude-50 border-b border-nude-200">
+              <img
+                src="https://images.unsplash.com/photo-1541167760496-1628856ab772?w=500&q=80"
+                alt="라떼 아트 커피"
+                class="card-img w-full h-full"
+                width="500"
+                height="96"
+                loading="lazy"
+              />
+            </div>
+            <div class="px-4 py-3.5">
+              <span class="text-[10px] font-mono text-nude-700 uppercase tracking-widest block font-bold">«class»</span>
+              <span class="block text-base font-bold text-nude-950 font-display flex items-center gap-1">
+                ☕ Coffee
+              </span>
+              <span class="block text-xs text-nude-800 mt-1 font-semibold">extends Drink</span>
+              <span class="block text-xs text-nude-700 mt-0.5 font-mono">-_bean_type: String</span>
+              <span class="inline-block mt-2.5 text-[10px] px-2 py-0.5 rounded-full bg-nude-50 text-nude-800 border border-nude-200 font-bold">✨ 기본 정가: 4,500원</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            id="node-tea"
+            data-class="Tea"
+            class="class-node text-left rounded-2xl border border-nude-200 bg-white overflow-hidden focus:outline-none shadow-sm"
+          >
+            <div class="h-24 w-full overflow-hidden bg-nude-50 border-b border-nude-200">
+              <img
+                src="https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=500&q=80"
+                alt="홍차 티"
+                class="card-img w-full h-full"
+                width="500"
+                height="96"
+                loading="lazy"
+              />
+            </div>
+            <div class="px-4 py-3.5">
+              <span class="text-[10px] font-mono text-nude-700 uppercase tracking-widest block font-bold">«class»</span>
+              <span class="block text-base font-bold text-nude-950 font-display flex items-center gap-1">
+                🍵 Tea
+              </span>
+              <span class="block text-xs text-nude-800 mt-1 font-semibold">extends Drink</span>
+              <span class="block text-xs text-nude-700 mt-0.5 font-mono">-_temperature: int</span>
+              <span class="inline-block mt-2.5 text-[10px] px-2 py-0.5 rounded-full bg-nude-50 text-nude-800 border border-nude-200 font-bold">✨ 기본 정가: 4,000원</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="order-heading" class="lg:col-span-5 flex flex-col gap-6">
+      <div>
+        <h2 id="order-heading" class="text-sm font-bold tracking-wider text-nude-800 uppercase mb-4 flex items-center gap-2">
+          <span>🛒</span> ORDER SIMULATION
+        </h2>
+
+        <div class="rounded-3xl border border-nude-200 bg-white p-6 space-y-4 shadow-sm">
+          <div>
+            <label for="menu-select" class="block text-xs font-bold text-nude-800 mb-2 uppercase tracking-wide">메뉴 선택</label>
+            <select id="menu-select" class="w-full rounded-xl bg-nude-50 border border-nude-200 px-4 py-3 text-nude-950 font-semibold text-sm focus:outline-none">
+              <option value="coffee-latte">☕ 시그니처 라떼 (Coffee | 4,500원)</option>
+              <option value="coffee-espresso">☕ 케냐 에스프레소 (Coffee | 4,000원)</option>
+              <option value="tea-green">🍵 우지 프레시 녹차 (Tea | 4,000원)</option>
+              <option value="tea-chai">🍵 스파이스 차이티 (Tea | 4,500원)</option>
+              <option value="drink-water">🥤 프리미엄 탄산수 (Drink | 3,000원)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 pt-1">
+            <button
+              type="button"
+              id="btn-order"
+              class="w-full rounded-xl bg-nude-950 hover:bg-nude-800 text-white font-bold py-3 text-sm transition-all focus:outline-none shadow-sm"
+            >
+              주문하기 — polymorphic prepare()
+            </button>
+
+            <button
+              type="button"
+              id="btn-batch"
+              class="w-full rounded-xl border border-nude-200 bg-nude-50 hover:bg-nude-100 text-nude-950 font-bold py-3 text-sm transition-colors focus:outline-none"
+            >
+              배치 주문 (BeverageADT[] 순회)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="order-preview" class="rounded-2xl border-2 border-dashed border-nude-200 p-5 min-h-[140px] text-xs bg-white shadow-sm flex flex-col justify-center">
+        <p class="font-display text-nude-700 text-center text-sm mb-1 italic">— 주문 미리보기 —</p>
+        <div class="text-center text-nude-700 font-normal py-4">주문 결과가 여기에 실시간 명세서로 표시됩니다.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="mt-auto bg-nude-100 border-t border-nude-200 py-8">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="rounded-3xl receipt-paper border border-nude-200 overflow-hidden">
+        <div class="receipt-zigzag" aria-hidden="true"></div>
+        
+        <div class="px-6 pt-5 pb-3 border-b border-dashed border-nude-200">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl" aria-hidden="true">👨‍🍳</span>
+              <div>
+                <h3 class="font-display text-xl font-bold text-nude-950">Barista 알림판</h3>
+                <p class="text-[11px] text-nude-700 font-normal">prepare() 제조 로그 · 실시간 다형성 호출 구조 역동 트레이싱</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="rng-indicator" class="hidden text-[10px] items-center gap-1.5 px-2.5 py-1 rounded-full bg-nude-50 border border-nude-300 text-nude-950 font-bold">
+                <span class="relative flex h-1.5 w-1.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-nude-800 opacity-60"></span>
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-nude-800"></span>
+                </span>
+                오늘의 행운 RNG
+              </span>
+              <button
+                type="button"
+                id="btn-clear-console"
+                class="text-[11px] text-nude-800 hover:text-nude-950 px-3 py-1.5 rounded-xl border border-nude-200 bg-nude-50 hover:bg-nude-100 transition-colors font-bold"
+              >
+                🧹 대시보드 & 콘솔 초기화
+              </button>
+            </div>
+          </div>
+          <p id="receipt-meta" class="text-center text-[10px] text-nude-700 mt-3 font-mono tracking-wider font-normal">CAFE OOP · ORDER #0000</p>
+        </div>
+
+        <div
+          id="live-console"
+          class="h-60 overflow-y-auto px-6 py-4 text-xs leading-relaxed space-y-1 bg-white font-semibold text-nude-950"
+          role="log"
+          aria-live="polite"
+        ></div>
+        
+        <div class="px-6 py-2.5 border-t border-dashed border-nude-200 text-center bg-nude-50">
+          <p class="text-[9px] text-nude-700 uppercase tracking-[0.25em] font-normal">Thank you · 다형성 데모</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════
+     * 📊 [확장] 게이미피케이션 대시보드 실시간 스태이트 관리 변수
+     * ═══════════════════════════════════════════════════════════════════ */
+    let totalSales = 0;
+    let criticalCount = 0;
+    let fumbleCount = 0;
+
+    const statSalesEl = document.getElementById('stat-sales');
+    const statCriticalEl = document.getElementById('stat-critical');
+    const statFumbleEl = document.getElementById('stat-fumble');
+
+    function updateDashboardView() {
+      statSalesEl.textContent = `${totalSales.toLocaleString()}원`;
+      statCriticalEl.textContent = `${criticalCount}회`;
+      statFumbleEl.textContent = `${fumbleCount}회`;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * 아키텍처 원본 완전체 이식 프로토콜 (UML 명세 완벽 반영)
+     * BeverageADT(interface) → Drink(abstract) → Coffee | Tea
+     * ═══════════════════════════════════════════════════════════════════ */
+
+    class BeverageADT {
+      // UML 명세 인터페이스 프로퍼티 계약
+      get name() { throw new Error('Property "name" must be implemented'); }
+      get price() { throw new Error('Property "price" must be implemented'); }
+
+      prepare() {
+        throw new Error('BeverageADT: prepare() must be implemented by subclass');
+      }
+      static satisfies(instance) {
+        return (
+          instance !== null &&
+          typeof instance === 'object' &&
+          typeof instance.prepare === 'function' &&
+          instance.prepare !== BeverageADT.prototype.prepare
+        );
+      }
+      static serve(beverage) {
+        if (!BeverageADT.satisfies(beverage)) {
+          throw new TypeError('Object does not implement BeverageADT.prepare()');
+        }
+        return beverage.prepare();
+      }
+    }
+
+    class Drink extends BeverageADT {
+      constructor(name, price = 3000) {
+        super();
+        // UML 명세 캡슐화 필드 (- 필드 구현)
+        this._name = name;
+        this._price = price;
+      }
+      
+      // UML 명세 Getter 프로퍼티 완벽 매핑 (+ 프로퍼티)
+      get name() { return this._name; }
+      get price() { return this._price; }
+
+      prepare() {
+        // 단일 기본 Drink 제품군 판매 시 대시보드 즉시 정산 반영
+        totalSales += this.price; 
+        return `[Drink.prepare] 🥤 ${this.name}: 기본 음료 준비 — 정가 ${this.price}원 전액 정산완료`;
+      }
+    }
+
+    class Coffee extends Drink {
+      constructor(name, price = 4500, beanType = 'Blend') {
+        super(name, price);
+        this._bean_type = beanType; // UML 특화 프라이빗 필드 매핑
+      }
+      prepare() {
+        const base = `[Coffee.prepare] ☕ ${this.name} (${this._bean_type} 원두): 에스프레소 추출 및 컵 세팅 (정가: ${this.price}원)`;
+        const roll = Math.random();
+        if (roll < 0.7) {
+          totalSales += (this.price + 500); // 팁 보너스 적립
+          criticalCount++;
+          return `${base}\n[골든 샷 추출 성공!] 최고의 크레마 밸런스로 손님이 만족해 팁을 얹어줍니다 (+500원 팁 보너스!)`;
+        }
+        totalSales += (this.price - 1000); // 패널티 손해액 차감
+        fumbleCount++;
+        return `${base}\n[원두 탄 맛 감지!] 추출 타이밍 미스로 탄 맛 발생 컴플레인 패널티 처리가 발생했습니다 (-1,000원 손해)`;
+      }
+    }
+
+    class Tea extends Drink {
+      constructor(name, price = 4000, temperature = 85) {
+        super(name, price);
+        this._temperature = temperature; // UML 특화 프라이빗 필드 매핑
+      }
+      prepare() {
+        const base = `[Tea.prepare] 🍵 ${this.name} (적정 온도: ${this._temperature}℃): 전용 브루잉 포트 가동 (정가: ${this.price}원)`;
+        const roll = Math.random();
+        if (roll < 0.8) {
+          totalSales += (this.price + 500); // 팁 보너스 적립
+          criticalCount++;
+          return `${base}\n[최적의 우림 시간 달성!] 황금 고형분 추출 비율 달성으로 보너스 정산이 추가됩니다 (+500원 팁 보너스!)`;
+        }
+        totalSales += (this.price - 1000); // 패널티 손해액 차감
+        fumbleCount++;
+        return `${base}\n[과추출 발생!] 티 스트레이너 분리 지연으로 떫은맛 대량 컴플레인 손실이 부과됩니다 (-1,000원 손해)`;
+      }
+    }
+
+    // --- UI Logic & Render View Sync Elements ---
+    const consoleEl = document.getElementById('live-console');
+    const previewEl = document.getElementById('order-preview');
+    const receiptMetaEl = document.getElementById('receipt-meta');
+    let receiptCounter = 0;
+
+    function bumpReceiptNumber() {
+      receiptCounter += 1;
+      if (receiptMetaEl) {
+        receiptMetaEl.textContent = `CAFE OOP · ORDER #${String(receiptCounter).padStart(4, '0')} · ${new Date().toLocaleString('ko-KR')}`;
+      }
+    }
+
+    const NODE_ELEMENTS = {
+      'BeverageADT': document.getElementById('node-interface'),
+      'Drink': document.getElementById('node-drink'),
+      'Coffee': document.getElementById('node-coffee'),
+      'Tea': document.getElementById('node-tea')
+    };
+
+    function flashUMLNode(ctorName) {
+      const targetNode = NODE_ELEMENTS[ctorName];
+      if (!targetNode) return;
+      targetNode.classList.remove('ring-4', 'flash-active');
+      void targetNode.offsetWidth; // DOM 트리거 리플로우 기법 활용
+      targetNode.classList.add('ring-4', 'flash-active');
+      setTimeout(() => { targetNode.classList.remove('ring-4', 'flash-active'); }, 1000);
+    }
+
+    const TYPE_STYLES = {
+      info: 'text-nude-950',
+      interface: 'text-nude-800 font-mono font-bold',
+      Drink: 'text-nude-950 font-bold',
+      Coffee: 'text-nude-950 font-bold',
+      Tea: 'text-nude-950 font-bold',
+      order: 'text-nude-950 font-bold',
+      batch: 'text-nude-800 font-bold',
+      procSuccess: 'text-nude-950 font-bold',
+      procFail: 'text-nude-800 font-bold',
+      procRoll: 'text-nude-950 font-bold',
+    };
+
+    const PROC_PATTERNS = {
+      coffeeSuccess: '[골든 샷 추출 성공!]',
+      coffeeFail: '[원두 탄 맛 감지!]',
+      teaSuccess: '[최적의 우림 시간 달성!]',
+      teaFail: '[과추출 발생!]',
+    };
+
+    function classifyPrepareResult(result) {
+      if (result.includes(PROC_PATTERNS.coffeeSuccess)) return { kind: 'Coffee', isProc: true, success: true, threshold: 0.7 };
+      if (result.includes(PROC_PATTERNS.coffeeFail)) return { kind: 'Coffee', isProc: true, success: false, threshold: 0.7 };
+      if (result.includes(PROC_PATTERNS.teaSuccess)) return { kind: 'Tea', isProc: true, success: true, threshold: 0.8 };
+      if (result.includes(PROC_PATTERNS.teaFail)) return { kind: 'Tea', isProc: true, success: false, threshold: 0.8 };
+      return { kind: 'normal', isProc: false, success: null, threshold: null };
+    }
+
+    function logToConsole(message, kind = 'info', extraClass = '') {
+      const line = document.createElement('div');
+      line.className = `console-line flex gap-2 py-1.5 border-b border-nude-200 last:border-0 ${TYPE_STYLES[kind] || TYPE_STYLES.info} ${extraClass}`.trim();
+      const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+      line.innerHTML = `
+        <span class="text-nude-700 select-none font-mono text-[10px] shrink-0 pt-0.5 font-bold">${time}</span>
+        <span class="leading-snug">${escapeHtml(message)}</span>`;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+      return line;
+    }
+
+    function logPrepareResultVisual(result, ctorName) {
+      const meta = classifyPrepareResult(result);
+      const rngIndicator = document.getElementById('rng-indicator');
+
+      if (meta.isProc) {
+        rngIndicator.classList.remove('hidden');
+        rngIndicator.classList.add('inline-flex');
+        
+        const pct = Math.round(meta.threshold * 100);
+        const label = meta.kind === 'Coffee' ? '골든 샷' : '최적 우림';
+        const rollWrap = document.createElement('div');
+        rollWrap.className = 'console-line my-2 rounded-xl border border-nude-200 bg-nude-50 px-4 py-3 shadow-sm';
+        rollWrap.innerHTML = `
+          <div class="text-[9px] uppercase tracking-widest text-nude-700 mb-1 font-bold">🎲 행운의 제조 판정 · ${meta.kind}.prepare()</div>
+          <div class="flex items-center justify-between text-[11px] text-nude-950 mb-1.5">
+            <span>Math.random() 결과 변동 스레드</span>
+            <span class="font-mono bg-white px-2 py-0.5 rounded-full border border-nude-200 font-bold">${label} &le; ${pct}%</span>
+          </div>
+          <div class="h-2 rounded-full bg-nude-200 overflow-hidden">
+            <div class="rng-meter-fill h-full rounded-full ${meta.success ? 'bg-nude-800' : 'bg-nude-300'}" style="width:0%"></div>
+          </div>
+          <div class="mt-1.5 text-[9px] text-nude-700 font-semibold">동적 런타임 수치 연산 결과 대시보드 반영 완료</div>
+        `;
+        consoleEl.appendChild(rollWrap);
+        requestAnimationFrame(() => {
+          const fill = rollWrap.querySelector('.rng-meter-fill');
+          if (fill) fill.style.width = meta.success ? `${pct}%` : `${100 - pct}%`;
+        });
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+      }
+
+      const parts = result.split('\n');
+      parts.forEach((part, idx) => {
+        const trimmed = part.trim();
+        if (!trimmed) return;
+
+        const isProcLine = Object.values(PROC_PATTERNS).some((p) => trimmed.includes(p));
+        if (isProcLine && meta.success === true) {
+          const banner = document.createElement('div');
+          banner.className = `console-line proc-banner my-2 rounded-xl border border-nude-300 bg-nude-50 px-4 py-3 shadow-sm ${TYPE_STYLES.procSuccess}`;
+          const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+          banner.innerHTML = `
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-base" aria-hidden="true">✨</span>
+              <span class="text-[10px] font-bold bg-nude-950 text-white px-2 py-0.5 rounded-md uppercase tracking-wide">CRITICAL · 골든 제조</span>
+              <span class="text-nude-700 text-[10px] font-mono ml-auto font-bold">${time}</span>
+            </div>
+            <span class="block font-bold text-nude-950 leading-snug">${escapeHtml(trimmed)}</span>`;
+          consoleEl.appendChild(banner);
+        } else if (isProcLine && meta.success === false) {
+          const banner = document.createElement('div');
+          banner.className = `console-line proc-fumble my-2 rounded-xl border border-nude-200 bg-white px-4 py-3 shadow-sm ${TYPE_STYLES.procFail}`;
+          const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+          banner.innerHTML = `
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-base" aria-hidden="true">😢</span>
+              <span class="text-[10px] font-bold bg-nude-700 text-white px-2 py-0.5 rounded-md uppercase tracking-wide">FUMBLE · 아쉬운 제조</span>
+              <span class="text-nude-700 text-[10px] font-mono ml-auto font-bold">${time}</span>
+            </div>
+            <span class="block font-bold text-nude-800 leading-snug">${escapeHtml(trimmed)}</span>`;
+          consoleEl.appendChild(banner);
+        } else {
+          logToConsole(trimmed, idx === 0 ? ctorName : meta.success === false ? 'procFail' : 'info');
+        }
+      });
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div'); div.textContent = s; return div.innerHTML;
+    }
+
+    function renderOrderPreview(result, ctorName) {
+      const meta = classifyPrepareResult(result);
+      const boxClass = meta.isProc
+        ? (meta.success ? 'border-nude-300 bg-nude-50' : 'border-nude-200 bg-white')
+        : 'border-nude-200 bg-nude-50';
+      const badge = meta.isProc
+        ? `<span class="inline-flex items-center gap-1 mb-2 px-2 py-0.5 rounded text-[10px] font-bold ${meta.success ? 'bg-nude-950 text-white' : 'bg-nude-700 text-white'}">${meta.success ? '✨ CRITICAL' : '😢 FUMBLE'}</span>`
+        : '';
+      const icon = ctorName === 'Coffee' ? '☕' : ctorName === 'Tea' ? '🍵' : ctorName === 'Drink' ? '🥤' : '📋';
+      
+      previewEl.innerHTML = `
+        <p class="font-display text-nude-950 text-center text-sm mb-2 font-bold">— 주문 미리보기 —</p>
+        <div class="rounded-xl border border-dashed px-4 py-3 ${boxClass}">
+          <div class="text-lg mb-1" aria-hidden="true">${icon}</div>
+          ${badge}
+          <div class="text-nude-950 leading-relaxed font-semibold">${result.split('\n').map(escapeHtml).join('<br>')}</div>
+        </div>`;
+    }
+
+    function dispatchPrepare(instance, source = 'click') {
+      bumpReceiptNumber();
+      const ctorName = instance.constructor.name;
+      logToConsole(`☕ ${source}: new ${ctorName}() &rarr; prepare()`, 'info');
+      logToConsole(`static type: Drink &middot; runtime type: ${ctorName}`, 'info');
+
+      // 다형성 추상 바인딩 노드 1번 기능 시각화 링크 연동
+      flashUMLNode(ctorName);
+
+      const result = BeverageADT.serve(instance);
+      if (ctorName === 'Coffee' || ctorName === 'Tea') {
+        logToConsole('⚡ 확률적 다형성 발동 — prepare() 내부 RNG 분기', 'procRoll');
+        logPrepareResultVisual(result, ctorName);
+      } else {
+        logPrepareResultVisual(result, ctorName);
+      }
+      
+      // 실시간 연산 연동 상태 새로고침
+      updateDashboardView();
+      renderOrderPreview(result, ctorName);
+    }
+
+    // 샘플 인스턴스 팩토리 (UML 스펙 주입)
+    const samples = {
+      BeverageADT: null,
+      Drink: new Drink('프리미엄 탄산수', 3000),
+      Coffee: new Coffee('시그니처 라떼', 4500, 'Kenya AA'),
+      Tea: new Tea('우지 프레시 녹차', 4000, 80),
+    };
+
+    // 왼쪽 클래스 카드 노드 클릭 매핑 파트 (1번 기능 상호 유지)
+    document.querySelectorAll('[data-class]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-class');
+
+        if (key === 'BeverageADT') {
+          bumpReceiptNumber();
+          flashUMLNode('BeverageADT');
+          logToConsole('── interface BeverageADT (contract)', 'interface');
+          logToConsole('  +name: property | +price: property 계약 상태', 'interface');
+          logToConsole('  +prepare(): void  — 구현 클래스: Drink, Coffee, Tea', 'interface');
+          previewEl.innerHTML = `
+            <p class="font-display text-nude-950 text-center text-sm mb-2 font-bold">— 주문 미리보기 —</p>
+            <div class="rounded-xl border border-dashed border-nude-300 bg-white px-4 py-3 text-nude-950 font-mono text-center font-bold">interface BeverageADT { prepare(): void }</div>`;
+          return;
+        }
+
+        const instance = samples[key];
+        if (instance) dispatchPrepare(instance, `class node · ${key}`);
+      });
+    });
+
+    function createFromMenu(value) {
+      const map = {
+        'coffee-latte': () => new Coffee('시그니처 라떼', 4500, 'Kenya AA'),
+        'coffee-espresso': () => new Coffee('케냐 에스프레소', 4000, 'Dark Blend'),
+        'tea-green': () => new Tea('우지 프레시 녹차', 4000, 80),
+        'tea-chai': () => new Tea('스파이스 차이티', 4500, 90),
+        'drink-water': () => new Drink('프리미엄 탄산수', 3000),
+      };
+      const factory = map[value];
+      return factory ? factory() : new Drink('알 수 없는 음료', 3000);
+    }
+
+    // 단일 주문하기 버튼 연동
+    document.getElementById('btn-order').addEventListener('click', () => {
+      const value = document.getElementById('menu-select').value;
+      const beverage = createFromMenu(value);
+      logToConsole('── order placed (BeverageADT reference)', 'order');
+      dispatchPrepare(beverage, 'order');
+    });
+
+    // 배치 주문 버튼 연동 (순차 플래시 애니메이션 루프 타이머 완벽 적용)
+    document.getElementById('btn-batch').addEventListener('click', () => {
+      const orders = [
+        new Coffee('에스프레소', 4000, 'Dark Blend'),
+        new Tea('얼그레이 오렌지', 4000, 85),
+        new Drink('레몬수', 3000),
+        new Coffee('바닐라 라떼', 5000, 'Blend'),
+        new Tea('루이보스', 4000, 90),
+      ];
+
+      logToConsole('── batch: for (const b of orders) b.prepare()', 'batch');
+      
+      orders.forEach((b, i) => {
+        setTimeout(() => {
+          dispatchPrepare(b, 'batch');
+        }, i * 250); // 250ms 간격으로 순차적 노드 플래시 및 누적 처리 가시화
+      });
+    });
+
+    // 리셋 핸들러
+    document.getElementById('btn-clear-console').addEventListener('click', () => {
+      consoleEl.innerHTML = '';
+      totalSales = 0; criticalCount = 0; fumbleCount = 0;
+      updateDashboardView();
+      document.getElementById('rng-indicator').classList.add('hidden');
+      logToConsole('🧹 시스템 데이터와 누적 실시간 매출 통계 대시보드가 초기화되었습니다.');
+    });
+
+    // 초기 실행부 로그
+    logToConsole('🌸 시스템 로그 활성화 완료. UML 아키텍처 규격의 가격 캡슐화 필드가 동적으로 바인딩되었습니다.');
+  </script>
+</body>
+</html>
